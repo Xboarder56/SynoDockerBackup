@@ -1,10 +1,19 @@
 import requests
 import socket
 import json
-import urllib3
 import logging
 import os
-from urllib.parse import urlencode, quote_plus
+import six
+
+if six.PY2:
+  import urllib
+else:
+  from urllib.parse import urlencode, quote_plus
+
+# Logging Object
+logging.getLogger().addHandler(logging.StreamHandler())
+root = logging.getLogger()
+root.setLevel(logging.INFO)
 
 dsm_host = ""
 dsm_port = "5001"
@@ -13,8 +22,8 @@ password = ""
 output_path = "/volume1/Backup/Docker"
 https = True
 
-
 def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
+
     params = {
         "account": user_name,
         "passwd": password,
@@ -29,13 +38,17 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
 
 
     if https:
-        urllib3.disable_warnings()
         syno_server_url = "https://{}:{}".format(dsm_host, dsm_port)
     else:
         syno_server_url = "http://{}:{}".format(dsm_host, dsm_port)
 
     with requests.Session() as s:
-        auth_url = "{}/webapi/auth.cgi?{}".format(syno_server_url, urlencode(params, quote_via=quote_plus))
+        requests.packages.urllib3.disable_warnings()  # Disable SSL Warnings
+        if six.PY2:
+            encoded_uri = urllib.urlencode(params) # Python2
+        else:
+            encoded_uri = urlencode(params, quote_via=quote_plus) #Python3
+        auth_url = "{}/webapi/auth.cgi?{}".format(syno_server_url, encoded_uri)
         response = s.get(auth_url, verify=False)
         if response.json().get("success", False):
             logging.info("Logged into DSM Successfully")
@@ -62,7 +75,7 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
                     "type": "all"
                 }
                 result = s.post("{}/webapi/entry.cgi".format(syno_server_url), cookies=cookies, data=payload,
-                                headers=headers)
+                                headers=headers, verify=False)
                 containers = []
                 for container in result.json()["data"].get("containers", []):
                     containers.append(container.get("name"))
@@ -80,7 +93,7 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
                     }
 
                     docker_url = "{}/webapi/entry.cgi?api=SYNO.Docker.Container.Profile&method=export&version=1&name=%22{}%22&SynoToken={}".format(syno_server_url, image, SynoToken)
-                    response = s.get(docker_url, cookies=cookies)
+                    response = s.get(docker_url, cookies=cookies, verify=False)
 
                     if 200 <= response.status_code < 203:
                         logging.info("Successfully pulled {} config.".format(image))
@@ -103,4 +116,3 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
 
 if __name__ == '__main__':
     main(dsm_host, dsm_port, user_name, password, output_path, https)
-
