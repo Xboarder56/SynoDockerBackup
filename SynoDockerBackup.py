@@ -30,12 +30,12 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
 
     if https:
         urllib3.disable_warnings()
-        syno_server_url = f"https://{dsm_host}:{dsm_port}"
+        syno_server_url = "https://{}:{}".format(dsm_host, dsm_port)
     else:
-        syno_server_url = f"http://{dsm_host}:{dsm_port}"
+        syno_server_url = "http://{}:{}".format(dsm_host, dsm_port)
 
     with requests.Session() as s:
-        auth_url = f"{syno_server_url}/webapi/auth.cgi?{urlencode(params, quote_via=quote_plus)}"
+        auth_url = "{}/webapi/auth.cgi?{}".format(syno_server_url, urlencode(params, quote_via=quote_plus))
         response = s.get(auth_url, verify=False)
         if response.json().get("success", False):
             logging.info("Logged into DSM Successfully")
@@ -61,7 +61,7 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
                     "offset": "0",
                     "type": "all"
                 }
-                result = s.post(f"{syno_server_url}/webapi/entry.cgi", cookies=cookies, data=payload,
+                result = s.post("{}/webapi/entry.cgi".format(syno_server_url), cookies=cookies, data=payload,
                                 headers=headers)
                 containers = []
                 for container in result.json()["data"].get("containers", []):
@@ -79,19 +79,19 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
                         "id": sid,
                     }
 
-                    docker_url = f'{syno_server_url}/webapi/entry.cgi?api=SYNO.Docker.Container.Profile&method=export&version=1&name=%22{image}%22&SynoToken={SynoToken}'
+                    docker_url = "{}/webapi/entry.cgi?api=SYNO.Docker.Container.Profile&method=export&version=1&name=%22{}%22&SynoToken={}".format(syno_server_url, image, SynoToken)
                     response = s.get(docker_url, cookies=cookies)
 
                     if 200 <= response.status_code < 203:
-                        logging.info(f"Successfully pulled {image} config.")
-                        file_path = os.path.join(output_path, f"{image}.json")
+                        logging.info("Successfully pulled {} config.".format(image))
+                        file_path = os.path.join(output_path, "{}.json".format(image))
 
                         # Write Config File
                         syno_docker_config_file = open(file_path, 'w')
                         syno_docker_config_file.write(json.dumps(response.json(), indent=4))
                         syno_docker_config_file.close()
                     else:
-                        logging.error(f"Unable to pull image {image}: %s", response.content)
+                        logging.error("Unable to pull image {}: %s".format(image), response.content)
 
                 docker_pull(container_name, sid, SynoToken, output_path)
             logging.info("Successfully Backed up container configs to: %s", output_path)
@@ -103,3 +103,4 @@ def main(dsm_host, dsm_port, user_name, password, output_path, https=None):
 
 if __name__ == '__main__':
     main(dsm_host, dsm_port, user_name, password, output_path, https)
+
